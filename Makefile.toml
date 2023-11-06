@@ -125,6 +125,7 @@ rm -rf plugins
 rm -rf versions
 rm -rf world
 rm -rf world_nether
+rm -rf world_the_end
 rm banned-ips.json
 rm banned-players.json
 rm bukkit.yml
