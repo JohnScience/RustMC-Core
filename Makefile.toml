@@ -5,35 +5,35 @@ script = '''
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
-fn cdylib_path<const DEBUG: bool>() -> PathBuf {
+fn cdylib_path(is_debug: bool) -> PathBuf {
     let mut buf: PathBuf = std::env::current_dir().unwrap();
     buf.push("target");
-    if DEBUG {
+    if is_debug {
         buf.push("debug");
-        if !buf.exists() {
-            Command::new("cargo")
-                .arg("build")
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit())
-                .output()
-                .expect("Failed to build");
-        }
+        Command::new("cargo")
+            .arg("build")
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .output()
+            .expect("Failed to build");
     } else {
         buf.push("release");
-        if !buf.exists() {
-            Command::new("cargo")
-                .arg("build")
-                .arg("--release")
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit())
-                .output()
-                .expect("Failed to build");
-        }
+        Command::new("cargo")
+            .arg("build")
+            .arg("--release")
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .output()
+            .expect("Failed to build");
     }
     #[cfg(target_os = "windows")]
     buf.push("mclib.dll");
     #[cfg(target_os = "linux")]
     buf.push("libmc_lib.so");
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    panic!("Unsupported OS");
+
     if !buf.exists() {
         panic!("{} not found", buf.display());
     }
@@ -62,9 +62,47 @@ fn jar_path() -> PathBuf {
     buf
 }
 
+fn request_eula_agreement() {
+    let mut eula = PathBuf::from("eula.txt");
+    if eula.exists() {
+        return;
+    }
+
+    println!("You must agree to the EULA (https://aka.ms/MinecraftEULA) to proceed.");
+    println!("Do you agree to the EULA? [y/n]");
+    let mut prompt_buf = String::new();
+    loop {
+        std::io::stdin().read_line(&mut prompt_buf).unwrap();
+        prompt_buf = prompt_buf.trim().to_string();
+        if prompt_buf == "y" {
+            std::fs::write(&eula, "eula=true").unwrap();
+            break;
+        } else if prompt_buf == "n" {
+            panic!("You must agree to the EULA to proceed");
+        } else {
+            println!("Invalid input");
+        };
+    }
+}
+
 fn main() {
-    const IS_DEBUG: bool = false;
-    let cdylib_path: PathBuf = cdylib_path::<IS_DEBUG>();
+    request_eula_agreement();
+    let is_debug: bool = {
+        let mut prompt_buf = String::new();
+        loop {
+            println!("Debug or release? [d/r]");
+            std::io::stdin().read_line(&mut prompt_buf).unwrap();
+            prompt_buf = prompt_buf.trim().to_string();
+            if prompt_buf == "d" {
+                break true;
+            } else if prompt_buf == "r" {
+                break false;
+            } else {
+                println!("Invalid input");
+            };
+        }
+    };
+    let cdylib_path: PathBuf = cdylib_path(is_debug);
     Command::new("java")
         .arg(format!("-Djava.library.path={}", cdylib_path.parent().unwrap().display()))
         .arg("-jar")
