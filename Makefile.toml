@@ -1,0 +1,107 @@
+[tasks.dev]
+script_runner = "@rust"
+cwd = "./"
+script = '''
+use std::path::PathBuf;
+use std::process::{Command, Stdio};
+
+fn cdylib_path<const DEBUG: bool>() -> PathBuf {
+    let mut buf: PathBuf = std::env::current_dir().unwrap();
+    buf.push("target");
+    if DEBUG {
+        buf.push("debug");
+        if !buf.exists() {
+            Command::new("cargo")
+                .arg("build")
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .output()
+                .expect("Failed to build");
+        }
+    } else {
+        buf.push("release");
+        if !buf.exists() {
+            Command::new("cargo")
+                .arg("build")
+                .arg("--release")
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit())
+                .output()
+                .expect("Failed to build");
+        }
+    }
+    #[cfg(target_os = "windows")]
+    buf.push("mclib.dll");
+    #[cfg(target_os = "linux")]
+    buf.push("libmc_lib.so");
+    if !buf.exists() {
+        panic!("{} not found", buf.display());
+    }
+    buf
+}
+
+fn jar_path() -> PathBuf {
+    let mut buf: PathBuf = std::env::current_dir().unwrap();
+    buf.pop();
+    buf.push("RustMC-Paper");
+    if !buf.exists() {
+        panic!("../RustMC-Paper not found");
+    }
+    buf.push("build");
+    if !buf.exists() {
+        panic!("../RustMC-Paper/build not found");
+    }
+    buf.push("libs");
+    if !buf.exists() {
+        panic!("../RustMC-Paper/build/libs not found");
+    }
+    buf.push("paper-bundler-1.20.1-R0.1-SNAPSHOT-mojmap.jar");
+    if !buf.exists() {
+        panic!("../RustMC-Paper/build/libs/paper-bundler-1.20.1-R0.1-SNAPSHOT-mojmap.jar not found");
+    }
+    buf
+}
+
+fn main() {
+    const IS_DEBUG: bool = false;
+    let cdylib_path: PathBuf = cdylib_path::<IS_DEBUG>();
+    Command::new("java")
+        .arg(format!("-Djava.library.path={}", cdylib_path.parent().unwrap().display()))
+        .arg("-jar")
+        .arg(jar_path())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .stdin(Stdio::inherit())
+        .output()
+        .expect("Failed to start paper");
+}
+'''
+
+[tasks.clean-server]
+script_runner = "@shell"
+script = '''
+rm -rf config
+rm -rf libraries
+rm -rf logs
+rm -rf plugins
+rm -rf versions
+rm -rf world
+rm -rf world_nether
+rm banned-ips.json
+rm banned-players.json
+rm bukkit.yml
+rm commands.yml
+rm eula.txt
+rm help.yml
+rm ops.json
+rm permissions.yml
+rm server.properties
+rm spigot.yml
+rm usercache.json
+rm version_history.json
+rm whitelist.json
+rm *.log
+'''
+
+[config]
+skip_core_tasks = true
